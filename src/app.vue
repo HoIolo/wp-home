@@ -15,6 +15,7 @@
 <script setup lang="ts">
 import nprogress from "nprogress";
 import "animate.css";
+import { postIncrementVisitorCount } from "~/api/websiteApi";
 
 const isShowLoading = ref(true);
 
@@ -42,7 +43,7 @@ nuxtApp.hook("page:start", () => {
 });
 const isComplete = ref(false);
 provide("isLoadingComplete", isComplete);
-const isCancleOverflow = ref(false)
+const isCancleOverflow = ref(false);
 
 nuxtApp.hook("page:finish", () => {
   nprogress.done();
@@ -58,11 +59,17 @@ onMounted(() => {
   setTimeout(() => {
     document.body.classList.add("pageLoadingComplete");
     isComplete.value = true;
+
+    // 记录网站访问次数
+    postIncrementVisitorCount({
+      date: new Date().toISOString().split("T")[0],
+      count: 1,
+    });
   }, 1500);
   setTimeout(() => {
     // 防止滚动条出现
-    isCancleOverflow.value = true
-  }, 3000)
+    isCancleOverflow.value = true;
+  }, 3000);
 });
 </script>
 
