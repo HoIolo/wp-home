@@ -9,7 +9,6 @@
   },
   "devDependencies": {
     "@element-plus/nuxt": "^1.0.6",
-    "@fullhuman/postcss-purgecss": "^5.0.0",
     "@nuxt/devtools": "^0.8.5",
     "babel-eslint": "^10.1.0",
     "cz-conventional-changelog": "^3.3.0",

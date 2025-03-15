@@ -48,13 +48,16 @@
       </div>
 
       <div class="ai-chat-input">
-        <textarea
-          v-model="chatMsg"
-          @keydown.prevent.enter="sendMessage"
-          placeholder="请输入问题..."
-          rows="3"
-          :disabled="isAiResponding"
-        ></textarea>
+        <div class="chat-text-input">
+          <MaskNotLogin :isShowMask="isEmpty(userData)" />
+          <textarea
+            v-model="chatMsg"
+            @keydown.prevent.enter="sendMessage"
+            placeholder="请输入问题..."
+            rows="3"
+            :disabled="isAiResponding"
+          ></textarea>
+        </div>
         <el-button
           :type="isAiResponding ? 'danger' : 'primary'"
           size="small"
@@ -72,6 +75,8 @@ import { ref, computed, watch, onMounted, onBeforeUnmount } from "vue";
 import { MdPreview } from "md-editor-v3";
 import "md-editor-v3/lib/preview.css";
 import { Close } from "@element-plus/icons-vue";
+import { ElMessage } from "element-plus";
+import { isEmpty } from "undraw-ui";
 import { getAIReply, type GetAiReplyBody } from "~/api/aiApi";
 import type { UserStateType } from "~/types/user";
 
@@ -203,8 +208,14 @@ const sendMessage = async () => {
     await stopAiResponse();
     return;
   }
-
-  if (!chatMsg.value.trim() || !userData.value) return;
+  if (!userData.value) {
+    ElMessage.warning("请先登录");
+    return;
+  }
+  if (!chatMsg.value.trim()) {
+    ElMessage.warning("请输入问题");
+    return;
+  }
 
   // 添加用户消息
   chatMessages.value.push({
@@ -354,14 +365,14 @@ watch(
 
 .ai-chat-window {
   width: 550px;
-  height: 600px;
+  height: 0;
   background-color: #fff;
   border-radius: 10px;
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  margin-left: -350px;
+  margin-left: -550px;
   opacity: 0;
   transform: translateX(-20px);
   transition: all 0.3s ease;
@@ -370,6 +381,7 @@ watch(
 
 .ai-chat-open .ai-chat-window {
   margin-left: 15px;
+  height: 600px;
   opacity: 1;
   transform: translateX(0);
   pointer-events: all;
@@ -441,7 +453,7 @@ watch(
   .ai-model-select {
     font-size: 10px;
     gap: 3px;
-    pointer-events: none
+    pointer-events: none;
   }
 
   .ai-chat-open .ai-model-select {
@@ -535,7 +547,6 @@ watch(
   border: 1px solid #ddd;
   border-radius: 5px;
   padding: 8px;
-  margin-bottom: 10px;
   resize: none;
   outline: none;
   font-family: "auto";
@@ -543,6 +554,11 @@ watch(
 
 .ai-chat-input button {
   align-self: flex-end;
+}
+
+.ai-chat-input .chat-text-input {
+  position: relative;
+  margin-bottom: 10px;
 }
 
 /* 移动端适配输入框 */
