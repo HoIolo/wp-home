@@ -13,3 +13,18 @@ export const getWebsiteSetting = (params?: GetWebsiteSettingParams) => {
     params,
   });
 };
+
+export type PostIncrementVisitorCountData = {
+  date: string; // 日期 [YYYY MM DD]
+};
+
+/**
+ * 增加网站访问次数
+ */
+export const postIncrementVisitorCount = (data: PostIncrementVisitorCountData) => {
+  return useRequest<ResponseData<any>>({
+    url: "/website/visitor/increment",
+    method: "POST",
+    data
+  });
+};

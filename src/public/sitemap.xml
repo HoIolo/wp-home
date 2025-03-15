@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <!-- 主页 -->
+  <url>
+    <loc>https://www.hoiolo.cn/</loc>
+    <lastmod>2023-12-01</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  
+  <!-- 文章归档页 -->
+  <url>
+    <loc>https://www.hoiolo.cn/article/archive</loc>
+    <lastmod>2023-12-01</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  
+  <!-- 关于页 -->
+  <url>
+    <loc>https://www.hoiolo.cn/about</loc>
+    <lastmod>2023-12-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  
+  <!-- 标签页 -->
+  <url>
+    <loc>https://www.hoiolo.cn/article/tags</loc>
+    <lastmod>2023-12-01</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  
+  <!-- 聊天页 -->
+  <url>
+    <loc>https://www.hoiolo.cn/chat</loc>
+    <lastmod>2023-12-01</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  
+  <!-- 好友页 -->
+  <url>
+    <loc>https://www.hoiolo.cn/friends</loc>
+    <lastmod>2023-12-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  
+  <!-- 登录页 -->
+  <url>
+    <loc>https://www.hoiolo.cn/login</loc>
+    <lastmod>2023-12-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  
+  <!-- 注册页 -->
+  <url>
+    <loc>https://www.hoiolo.cn/register</loc>
+    <lastmod>2023-12-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  
+  <!-- 消息页 -->
+  <url>
+    <loc>https://www.hoiolo.cn/message</loc>
+    <lastmod>2023-12-01</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  
+</urlset>

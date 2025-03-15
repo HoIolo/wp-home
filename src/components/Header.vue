@@ -11,23 +11,36 @@
     <div class="logo">
       <nuxt-link to="/">{{ props.logoText }}</nuxt-link>
     </div>
-    <div class="menuBtn hide" @click="showMiniMenu">☰</div>
+    <div class="menuBtn hide" @click="showMiniMenu">
+      <svg
+        viewBox="0 0 24 24"
+        width="24"
+        height="24"
+        stroke="currentColor"
+        stroke-width="2"
+        fill="none"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <line x1="3" y1="12" x2="21" y2="12"></line>
+        <line x1="3" y1="6" x2="21" y2="6"></line>
+        <line x1="3" y1="18" x2="21" y2="18"></line>
+      </svg>
+    </div>
     <div class="menus" :class="{ miniMenuShow: isShowMiniMenu }">
       <div class="closed hide" @click="closeMiniMenu">
         <svg
-          t="1699412633290"
-          class="icon"
-          viewBox="0 0 1024 1024"
-          version="1.1"
-          xmlns="http://www.w3.org/2000/svg"
-          p-id="4017"
-          width="25"
-          height="25"
+          viewBox="0 0 24 24"
+          width="24"
+          height="24"
+          stroke="currentColor"
+          stroke-width="2"
+          fill="none"
+          stroke-linecap="round"
+          stroke-linejoin="round"
         >
-          <path
-            d="M801.645714 170.666667l51.833905 51.590095L565.150476 511.951238l288.353524 289.670095-51.833905 51.614477-288.109714-289.450667L225.426286 853.23581 173.592381 801.621333l288.329143-289.670095L173.592381 222.256762 225.426286 170.666667l288.109714 289.426285L801.645714 170.666667z"
-            p-id="4018"
-          ></path>
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
         </svg>
       </div>
       <slot>
@@ -171,8 +184,13 @@ onMounted(() => {
 
 <style scoped>
 .menus .router-link-active {
-  color: pink;
+  color: #ace0f9;
   font-weight: bold;
+}
+
+.head.stickTop .menus .router-link-active,
+.head:hover .menus .router-link-active {
+  color: #51a6e6;
 }
 
 .loginAndRegister {
@@ -243,7 +261,7 @@ onMounted(() => {
   font-size: 1.875rem;
   background-color: rgba(255, 244, 244, 0.5);
   border-radius: 15px;
-  padding: .5rem;
+  padding: 0.5rem;
 }
 
 .head .menus {
@@ -252,7 +270,7 @@ onMounted(() => {
 }
 
 .hide {
-  display: none;
+  display: none !important;
 }
 
 .head .other .search a,
@@ -270,28 +288,42 @@ onMounted(() => {
 
 @media screen and (max-width: 768px) {
   .menuBtn {
-    display: block !important;
+    display: flex !important;
+    height: 50px;
   }
 
   .head .menus .logo {
     display: block;
-    font-size: 1.5rem;
-    padding: 2rem;
-    font-family: cursive;
+    font-size: 1.8rem;
+    padding: 1.5rem 1rem 2rem;
+    font-family: tsxmm;
+    margin-bottom: 10px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
   }
 
   .closed {
-    display: block !important;
-  }
-
-  .closed {
+    display: flex !important;
+    justify-content: center;
+    align-items: center;
     position: absolute;
-    right: 10px;
-    top: 10px;
+    right: 15px;
+    top: 15px;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background-color: rgba(0, 0, 0, 0.05);
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+
+  .closed:hover {
+    background-color: rgba(0, 0, 0, 0.1);
+    transform: rotate(90deg);
   }
 
   .miniMenuShow {
     left: 0 !important;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
   }
 
   .head {
@@ -308,24 +340,38 @@ onMounted(() => {
   }
 
   .head .menus {
-    /* display: none; */
     position: fixed;
-    left: -80vw;
+    left: -100vw;
     top: 0;
     flex-direction: column;
-    justify-content: start;
+    justify-content: flex-start;
     height: 100vh;
-    width: 220px;
+    width: 280px;
     background-color: #fff;
     box-shadow: 0 0 10px var(--shadow);
     text-align: center;
     color: #000;
-    transition: all 0.5s;
+    transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    overflow-y: auto;
+    padding: 20px 0;
+    z-index: 1000;
   }
 
   .head .menus a {
-    width: 11rem;
+    width: 100%;
     line-height: 50px;
+    padding: 0 20px;
+    margin: 5px 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+    border-radius: 8px;
+  }
+
+  .head .menus a:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+    transform: translateX(5px);
   }
 
   .other {
@@ -412,5 +458,42 @@ onMounted(() => {
   line-height: 55px;
   font-size: 25px;
   margin-left: 15px;
+  cursor: pointer;
+  width: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  transition: all 0.3s;
+}
+
+.menuBtn:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.menu {
+  width: 100%;
+  margin: 5px 0;
+}
+
+@media screen and (max-width: 768px) {
+  .menus .el-dropdown {
+    width: 100%;
+    height: auto;
+    padding: 0 20px;
+    margin: 5px 0;
+  }
+
+  .menus .el-dropdown :deep(.el-dropdown-link) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 0;
+  }
+
+  .head .other .search span,
+  .head .other .user span {
+    font-size: 22px;
+  }
 }
 </style>
