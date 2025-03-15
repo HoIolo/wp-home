@@ -20,13 +20,18 @@
         <span class="ai-model-select">
           <span>AI模型:</span>
           <el-select v-model="aiModel" size="small">
-            <el-option value="qwen-max" label="max"></el-option>
+            <el-option
+              v-for="item in aiModelOptions"
+              :key="item.value"
+              :value="item.value"
+              :label="item.label"
+            ></el-option>
           </el-select>
         </span>
         <el-icon class="close-icon" @click="toggleChat"><Close /></el-icon>
       </div>
 
-      <div class="ai-chat-messages" ref="messagesRef">
+      <div class="ai-chat-messages" ref="messagesRef" @scroll="handleScroll">
         <template v-for="item in chatMessages" :key="item?.id">
           <div
             class="ai-chat-message"
@@ -40,6 +45,14 @@
                 <span>{{ item?.user?.name }}</span>
               </div>
               <div class="message-text">
+                <div v-if="item?.has_reasoning" class="reasoning-container">
+                  <div class="reasoning-content">
+                    <MdPreview
+                      :modelValue="item?.reasoning_content"
+                      :editorId="'r' + item.id"
+                    />
+                  </div>
+                </div>
                 <MdPreview :modelValue="item?.msg" :editorId="'a' + item.id" />
               </div>
             </div>
@@ -55,7 +68,6 @@
             @keydown.prevent.enter="sendMessage"
             placeholder="请输入问题..."
             rows="3"
-            :disabled="isAiResponding"
           ></textarea>
         </div>
         <el-button
@@ -74,14 +86,40 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount } from "vue";
 import { MdPreview } from "md-editor-v3";
 import "md-editor-v3/lib/preview.css";
-import { Close } from "@element-plus/icons-vue";
+import { Close, ArrowDown, ArrowUp } from "@element-plus/icons-vue";
 import { ElMessage } from "element-plus";
 import { isEmpty } from "undraw-ui";
 import { getAIReply, type GetAiReplyBody } from "~/api/aiApi";
 import type { UserStateType } from "~/types/user";
+import type { Message } from "~/api/aiApi";
+
+const formatMessages = (messages: any[]): Message[] => {
+  return messages
+    .filter((msg) => msg.user && msg.msg)
+    .map((msg) => ({
+      role: msg.user.id === 0 ? "assistant" : "user",
+      content: msg.has_reasoning
+        ? `${msg.reasoning_content}\n${msg.msg}`
+        : msg.msg,
+    }));
+};
 
 const isOpen = ref(false);
-const aiModel = ref("qwen-max");
+
+const aiModelOptions = [
+  {
+    value: "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
+    label: "DeepSeek-R1",
+    maxTokens: 16384,
+  },
+  {
+    value: "Qwen/Qwen2.5-7B-Instruct",
+    label: "Qwen-2.5-Instruct",
+    maxTokens: 1024,
+  },
+];
+
+const aiModel = ref("deepseek-ai/DeepSeek-R1-Distill-Qwen-7B");
 const chatMsg = ref("");
 const messagesRef = ref<HTMLDivElement>();
 const chatMessages = ref<any[]>([]);
@@ -91,10 +129,37 @@ const userData = ref<UserStateType | null>(null);
 const isAiResponding = ref(false);
 const currentReader = ref<ReadableStreamDefaultReader | null>(null);
 
+// 滚动相关状态
+const isUserScrolling = ref(false);
+const isAtBottom = ref(true);
+const scrollTimer = ref<NodeJS.Timeout | null>(null);
+
 // 拖拽相关状态
 const position = ref({ x: 20, y: 100 }); // 初始位置
 const isDragging = ref(false);
 const dragOffset = ref({ x: 0, y: 0 });
+
+// 处理滚动事件
+const handleScroll = () => {
+  if (!messagesRef.value) return;
+
+  // 清除之前的定时器
+  if (scrollTimer.value) {
+    clearTimeout(scrollTimer.value);
+  }
+
+  // 设置用户正在滚动标记
+  isUserScrolling.value = true;
+
+  // 检查是否在底部附近 (20px误差范围内视为底部)
+  const { scrollTop, scrollHeight, clientHeight } = messagesRef.value;
+  isAtBottom.value = scrollHeight - scrollTop - clientHeight < 20;
+
+  // 设置定时器，滚动停止后一段时间取消用户滚动标记
+  scrollTimer.value = setTimeout(() => {
+    isUserScrolling.value = false;
+  }, 200);
+};
 
 // 获取用户信息
 onMounted(async () => {
@@ -124,6 +189,11 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   document.removeEventListener("mousemove", handleMouseMove);
   document.removeEventListener("mouseup", handleMouseUp);
+
+  // 清除滚动定时器
+  if (scrollTimer.value) {
+    clearTimeout(scrollTimer.value);
+  }
 });
 
 // 开始拖拽
@@ -182,8 +252,10 @@ const handleMouseUp = () => {
 const toggleChat = () => {
   isOpen.value = !isOpen.value;
   if (isOpen.value) {
+    // 打开聊天窗口时重置滚动状态并滚动到底部
+    isAtBottom.value = true;
     setTimeout(() => {
-      scrollToBottom();
+      forceScrollToBottom();
     }, 300);
   }
 };
@@ -217,12 +289,19 @@ const sendMessage = async () => {
     return;
   }
 
+  // 发送新消息时重置滚动状态
+  isAtBottom.value = true;
+  isUserScrolling.value = false;
+
   // 添加用户消息
   chatMessages.value.push({
     id: Date.now(),
     user: userData.value,
     msg: chatMsg.value,
   });
+
+  // 在此处定义，防止获取到输入中的消息
+  const messages = formatMessages(chatMessages.value);
 
   // 添加AI正在输入的消息
   const aiMessageId = Math.random().toString(36).substring(2, 9);
@@ -240,7 +319,7 @@ const sendMessage = async () => {
   // 保存用户问题并清空输入框
   const prompt = chatMsg.value;
   chatMsg.value = "";
-  scrollToBottom();
+  forceScrollToBottom();
 
   // 获取上一次对话ID
   const prevConversationId =
@@ -248,10 +327,15 @@ const sendMessage = async () => {
       ? chatMessages.value[chatMessages.value.length - 3]?.conversation_id || ""
       : "";
 
+  const aiModelMaxTokens =
+    aiModelOptions.find((item) => item.value === aiModel.value)?.maxTokens ||
+    1024;
   // 调用AI接口
   const getAiReplyBody: GetAiReplyBody = {
-    ai: "TY",
+    ai: "SF",
     prompt,
+    messages,
+    max_tokens: aiModelMaxTokens,
     isStream: true,
     conversation_id: prevConversationId || "none",
   };
@@ -284,14 +368,36 @@ const sendMessage = async () => {
         lines.forEach((line) => {
           try {
             const dataObj = aiObj.parseJson(line);
+            if (isEmpty(dataObj)) return;
+            // 检查aiObj是否存在getReasoningContent方法
+            const reasoningContent =
+              "getReasoningContent" in aiObj
+                ? aiObj.getReasoningContent(dataObj)
+                : "";
             const content = aiObj.getContent(dataObj) || "";
 
-            if (i === 0) aiMessage.msg = "";
+            if (i === 0) {
+              aiMessage.msg = "";
+              aiMessage.reasoning_content = "";
+            }
             aiMessage.conversation_id = dataObj.id || dataObj.request_id;
             aiMessage.msg += content;
-            scrollToBottom();
+            if (reasoningContent) {
+              aiMessage.reasoning_content =
+                (aiMessage.reasoning_content || "") + reasoningContent;
+              aiMessage.has_reasoning = true;
+            }
+
+            // 只有当用户在底部或发送新消息后才自动滚动
+            if (isAtBottom.value && !isUserScrolling.value) {
+              scrollToBottom();
+            }
+
             i++;
-          } catch (e) {}
+          } catch (e) {
+            console.log("AI解析错误", e);
+            aiMessage.msg = "抱歉，我遇到了一些问题，请稍后再试。";
+          }
         });
       }
     } catch (error) {
@@ -310,12 +416,18 @@ const sendMessage = async () => {
     }
     isAiResponding.value = false;
     currentReader.value = null;
-    scrollToBottom();
+
+    // 错误情况下滚动到底部
+    if (isAtBottom.value) {
+      scrollToBottom();
+    }
   }
 };
 
-// 滚动到底部
+// 常规滚动到底部（只有当用户在底部或主动发送消息时才会触发）
 const scrollToBottom = () => {
+  if (!isAtBottom.value || isUserScrolling.value) return;
+
   setTimeout(() => {
     if (messagesRef.value) {
       messagesRef.value.scrollTop = messagesRef.value.scrollHeight;
@@ -323,11 +435,22 @@ const scrollToBottom = () => {
   }, 50);
 };
 
-// 监听消息变化，自动滚动到底部
+// 强制滚动到底部（在用户发送消息或打开聊天时使用）
+const forceScrollToBottom = () => {
+  setTimeout(() => {
+    if (messagesRef.value) {
+      messagesRef.value.scrollTop = messagesRef.value.scrollHeight;
+    }
+  }, 50);
+};
+
+// 修改消息监听方式，只在用户处于底部时自动滚动
 watch(
   chatMessages,
   () => {
-    scrollToBottom();
+    if (isAtBottom.value && !isUserScrolling.value) {
+      scrollToBottom();
+    }
   },
   { deep: true }
 );
@@ -493,7 +616,7 @@ watch(
   max-width: 70%;
 }
 
-.current-user .message-content {
+.current-user .message-name {
   text-align: right;
 }
 
@@ -563,6 +686,15 @@ watch(
 .ai-chat-input .chat-text-input {
   position: relative;
   margin-bottom: 10px;
+}
+.reasoning-content {
+  border-left: 2px solid #e5e5e5;
+  padding-left: 13px;
+  margin-bottom: 13px;
+}
+.reasoning-content ::v-deep(.md-editor-preview) {
+  color: #8b8b8b;
+  font-size: 14px;
 }
 
 /* 移动端适配输入框 */
