@@ -28,6 +28,9 @@ const errorMessages = [
   }
 ];
 const errorMessage = errorMessages.find((item) => item.code == props.error?.statusCode)?.message;
+useHead({
+  title: errorMessage,
+});
 </script>
 
 <style scoped>

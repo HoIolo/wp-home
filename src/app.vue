@@ -63,7 +63,6 @@ onMounted(() => {
     // 记录网站访问次数
     postIncrementVisitorCount({
       date: new Date().toISOString().split("T")[0],
-      count: 1,
     });
   }, 1500);
   setTimeout(() => {
@@ -117,7 +116,7 @@ onMounted(() => {
   width: 0rem;
   height: 5px;
   margin: 0 auto;
-  background-color: orange;
+  background: linear-gradient(#accbee, #ace0f9 100%);
   transition: 1s all cubic-bezier(0.46, 1, 0.23, 1);
 }
 

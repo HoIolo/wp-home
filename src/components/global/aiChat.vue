@@ -388,7 +388,7 @@ watch(
     margin-left: 0;
     transform: translateY(20px);
     border-radius: 0;
-    z-index: 9999;
+    z-index: -1;
   }
 
   .ai-chat-open .ai-chat-window {
@@ -399,7 +399,6 @@ watch(
   .ai-chat-container {
     flex-direction: column;
     align-items: flex-end;
-    z-index: 9999;
   }
 
   .ai-chat-button {
@@ -442,6 +441,11 @@ watch(
   .ai-model-select {
     font-size: 10px;
     gap: 3px;
+    pointer-events: none
+  }
+
+  .ai-chat-open .ai-model-select {
+    pointer-events: all;
   }
 
   .ai-model-select :deep(.el-select) {

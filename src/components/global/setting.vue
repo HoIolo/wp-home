@@ -95,6 +95,11 @@ const handleChange = (emitKey: any, emitVal: any) => {
 .setting_btn i {
   animation: rotateInfinite 2s linear infinite;
 }
+@media screen and (max-width: 768px) {
+  .setting {
+    display: none;
+  }
+}
 @keyframes rotateInfinite {
   0% {
     transform: rotate(0);

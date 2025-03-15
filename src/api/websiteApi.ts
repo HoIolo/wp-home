@@ -16,7 +16,6 @@ export const getWebsiteSetting = (params?: GetWebsiteSettingParams) => {
 
 export type PostIncrementVisitorCountData = {
   date: string; // 日期 [YYYY MM DD]
-  count: number;
 };
 
 /**
