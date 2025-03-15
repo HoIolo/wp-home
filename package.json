@@ -9,11 +9,13 @@
   },
   "devDependencies": {
     "@element-plus/nuxt": "^1.0.6",
+    "@fullhuman/postcss-purgecss": "^5.0.0",
     "@nuxt/devtools": "^0.8.5",
     "babel-eslint": "^10.1.0",
     "cz-conventional-changelog": "^3.3.0",
     "eslint": "^8.18.0",
     "nuxt": "^3.7.4",
+    "postcss": "^8.4.32",
     "unplugin-icons": "^0.17.0",
     "unplugin-vue-components": "^0.25.2",
     "vite-plugin-compression": "^0.5.1",

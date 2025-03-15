@@ -5,17 +5,34 @@ import Components from "unplugin-vue-components/vite";
 
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
-  hooks: {
-    "build:manifest": (manifest) => {
-      // 找到应用程序入口的CSS列表
-      const css = manifest["node_modules/nuxt/dist/app/entry.js"]?.css;
-      if (css) {
-        // 从数组的末尾开始，向前遍历
-        for (let i = css.length - 1; i >= 0; i--) {
-          // 如果以'entry'开头，从列表中删除它
-          if (css[i].startsWith("entry")) css.splice(i, 1);
-        }
-      }
+  postcss: {
+    plugins: {
+      '@fullhuman/postcss-purgecss':{
+        content: [
+          "./src/pages/**/*.vue",
+          "./src/layouts/**/*.vue",
+          "./src/components/**/*.vue",
+        ],
+        defaultExtractor(content) {
+          const contentWithoutStyleBlocks = content.replace(
+            /<style[^]+?<\/style>/gi,
+            ''
+          )
+          return (
+            contentWithoutStyleBlocks.match(
+              /[A-Za-z0-9-_/:]*[A-Za-z0-9-_/]+/g
+            ) || []
+          )
+        },
+        safelist: [
+          'html',
+          'body',
+          /-(leave|enter|appear)(|-(to|from|active))$/,
+          /^(?!(|.*?:)cursor-move).+-move$/,
+          /^router-link(|-exact)-active$/,
+          /data-v-.*/
+        ]
+      },
     },
   },
   nitro: {
