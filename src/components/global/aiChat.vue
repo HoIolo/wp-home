@@ -1,7 +1,11 @@
 <template>
   <div
     class="ai-chat-container"
-    :class="{ 'ai-chat-open': isOpen }"
+    :class="{
+      'ai-chat-open': isOpen,
+      'direction-left': chatDirection === 'left',
+      'direction-bottom': chatDirection === 'bottom',
+    }"
     :style="{ left: position.x + 'px', bottom: position.y + 'px' }"
   >
     <!-- 悬浮按钮 -->
@@ -20,13 +24,18 @@
         <span class="ai-model-select">
           <span>AI模型:</span>
           <el-select v-model="aiModel" size="small">
-            <el-option value="qwen-max" label="max"></el-option>
+            <el-option
+              v-for="item in aiModelOptions"
+              :key="item.value"
+              :value="item.value"
+              :label="item.label"
+            ></el-option>
           </el-select>
         </span>
         <el-icon class="close-icon" @click="toggleChat"><Close /></el-icon>
       </div>
 
-      <div class="ai-chat-messages" ref="messagesRef">
+      <div class="ai-chat-messages" ref="messagesRef" @scroll="handleScroll">
         <template v-for="item in chatMessages" :key="item?.id">
           <div
             class="ai-chat-message"
@@ -40,6 +49,32 @@
                 <span>{{ item?.user?.name }}</span>
               </div>
               <div class="message-text">
+                <div v-if="item?.has_reasoning" class="reasoning-container">
+                  <div
+                    class="reasoning-header"
+                    @click="toggleReasoning(item.id)"
+                  >
+                    <div class="reasoning-title">
+                      <el-icon><Document /></el-icon>
+                      深度思考
+                    </div>
+                    <div class="reasoning-toggle">
+                      <el-icon v-if="!expandedReasonings.includes(item.id)"
+                        ><ArrowDown
+                      /></el-icon>
+                      <el-icon v-else><ArrowUp /></el-icon>
+                    </div>
+                  </div>
+                  <div
+                    class="reasoning-content"
+                    :class="{ expanded: expandedReasonings.includes(item.id) }"
+                  >
+                    <MdPreview
+                      :modelValue="item?.reasoning_content"
+                      :editorId="'r' + item.id"
+                    />
+                  </div>
+                </div>
                 <MdPreview :modelValue="item?.msg" :editorId="'a' + item.id" />
               </div>
             </div>
@@ -55,7 +90,6 @@
             @keydown.prevent.enter="sendMessage"
             placeholder="请输入问题..."
             rows="3"
-            :disabled="isAiResponding"
           ></textarea>
         </div>
         <el-button
@@ -74,14 +108,44 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount } from "vue";
 import { MdPreview } from "md-editor-v3";
 import "md-editor-v3/lib/preview.css";
-import { Close } from "@element-plus/icons-vue";
+import { Close, ArrowDown, ArrowUp, Document } from "@element-plus/icons-vue";
 import { ElMessage } from "element-plus";
 import { isEmpty } from "undraw-ui";
 import { getAIReply, type GetAiReplyBody } from "~/api/aiApi";
 import type { UserStateType } from "~/types/user";
+import type { Message } from "~/api/aiApi";
+
+const formatMessages = (messages: any[]): Message[] => {
+  return messages
+    .filter((msg) => msg.user && msg.msg)
+    .map((msg) => ({
+      role: msg.user.id === 0 ? "assistant" : "user",
+      content: msg.has_reasoning
+        ? `${msg.reasoning_content}\n${msg.msg}`
+        : msg.msg,
+    }));
+};
 
 const isOpen = ref(false);
-const aiModel = ref("qwen-max");
+// 聊天窗口方向：'right'(默认), 'left', 'bottom'
+const chatDirection = ref("right");
+// 跟踪哪些推理内容已展开，默认所有都展开
+const expandedReasonings = ref<string[]>([]);
+
+const aiModelOptions = [
+  {
+    value: "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
+    label: "DeepSeek-R1",
+    maxTokens: 16384,
+  },
+  {
+    value: "Qwen/Qwen2.5-7B-Instruct",
+    label: "Qwen-2.5-Instruct",
+    maxTokens: 1024,
+  },
+];
+
+const aiModel = ref("deepseek-ai/DeepSeek-R1-Distill-Qwen-7B");
 const chatMsg = ref("");
 const messagesRef = ref<HTMLDivElement>();
 const chatMessages = ref<any[]>([]);
@@ -91,10 +155,71 @@ const userData = ref<UserStateType | null>(null);
 const isAiResponding = ref(false);
 const currentReader = ref<ReadableStreamDefaultReader | null>(null);
 
+// 滚动相关状态
+const isUserScrolling = ref(false);
+const isAtBottom = ref(true);
+const scrollTimer = ref<NodeJS.Timeout | null>(null);
+
 // 拖拽相关状态
 const position = ref({ x: 20, y: 100 }); // 初始位置
 const isDragging = ref(false);
 const dragOffset = ref({ x: 0, y: 0 });
+
+// 定义聊天窗口的宽度、高度和缓冲区
+const CHAT_WINDOW_WIDTH = 550;
+const CHAT_WINDOW_HEIGHT = 600;
+const BUFFER_DISTANCE = 20; // 距离边缘的缓冲距离
+
+// 切换推理内容的展开/折叠状态
+const toggleReasoning = (id: string) => {
+  const index = expandedReasonings.value.indexOf(id);
+  if (index === -1) {
+    expandedReasonings.value.push(id);
+  } else {
+    expandedReasonings.value.splice(index, 1);
+  }
+
+  // 等待DOM更新后，检查是否需要滚动
+  setTimeout(() => {
+    if (isAtBottom.value) {
+      scrollToBottom();
+    }
+  }, 100);
+};
+
+// 初始化展开状态 - 遍历所有消息添加到展开列表中
+const initExpandedReasonings = () => {
+  chatMessages.value.forEach((message) => {
+    if (
+      message.has_reasoning &&
+      !expandedReasonings.value.includes(message.id)
+    ) {
+      expandedReasonings.value.push(message.id);
+    }
+  });
+};
+
+// 处理滚动事件
+const handleScroll = () => {
+  if (!messagesRef.value) return;
+
+  // 清除之前的定时器
+  if (scrollTimer.value) {
+    clearTimeout(scrollTimer.value);
+  }
+
+  // 设置用户正在滚动标记
+  isUserScrolling.value = true;
+
+  // 检查是否在底部附近 (20px误差范围内视为底部)
+  const { scrollTop, scrollHeight, clientHeight } = messagesRef.value;
+  isAtBottom.value = scrollHeight - scrollTop - clientHeight < 20;
+
+  // 设置定时器，滚动停止后一段时间取消用户滚动标记
+  scrollTimer.value = setTimeout(() => {
+    isUserScrolling.value = false;
+  }, 200);
+};
 
 // 获取用户信息
 onMounted(async () => {
@@ -115,16 +240,60 @@ onMounted(async () => {
     });
   }
 
+  // 初始化所有展开状态
+  initExpandedReasonings();
+
   // 添加全局鼠标事件监听
   document.addEventListener("mousemove", handleMouseMove);
   document.addEventListener("mouseup", handleMouseUp);
+
+  // 添加窗口调整大小事件监听
+  window.addEventListener("resize", updateChatDirection);
+
+  // 初始化方向
+  updateChatDirection();
 });
 
 // 组件卸载前移除事件监听
 onBeforeUnmount(() => {
   document.removeEventListener("mousemove", handleMouseMove);
   document.removeEventListener("mouseup", handleMouseUp);
+  window.removeEventListener("resize", updateChatDirection);
+
+  // 清除滚动定时器
+  if (scrollTimer.value) {
+    clearTimeout(scrollTimer.value);
+  }
 });
+
+// 更新聊天窗口展示方向
+const updateChatDirection = () => {
+  const windowWidth = window.innerWidth;
+  const windowHeight = window.innerHeight;
+
+  // 计算当前按钮的绝对位置
+  const buttonRightEdge = position.value.x + 50; // 按钮宽度为50px
+  const buttonTopEdge = windowHeight - position.value.y;
+
+  // 检查右侧是否有足够空间
+  const hasEnoughRightSpace =
+    windowWidth - buttonRightEdge >= CHAT_WINDOW_WIDTH + BUFFER_DISTANCE;
+  // 检查顶部是否有足够空间
+  const hasEnoughTopSpace =
+    buttonTopEdge >= CHAT_WINDOW_HEIGHT + BUFFER_DISTANCE;
+
+  // 根据位置决定展示方向
+  if (!hasEnoughRightSpace && hasEnoughTopSpace) {
+    // 右侧空间不足，顶部空间足够，向左展示
+    chatDirection.value = "left";
+  } else if (!hasEnoughTopSpace) {
+    // 顶部空间不足，向下展示
+    chatDirection.value = "bottom";
+  } else {
+    // 默认向右展示
+    chatDirection.value = "right";
+  }
+};
 
 // 开始拖拽
 const startDrag = (event) => {
@@ -170,20 +339,29 @@ const handleMouseMove = (event) => {
   if (position.value.y > window.innerHeight - buttonHeight)
     position.value.y = window.innerHeight - buttonHeight;
 
+  // 在拖拽过程中即时更新聊天窗口方向
+  updateChatDirection();
+
   event.preventDefault();
 };
 
 // 结束拖拽
 const handleMouseUp = () => {
   isDragging.value = false;
+  // 在拖拽结束后更新聊天窗口方向
+  updateChatDirection();
 };
 
 // 切换聊天窗口
 const toggleChat = () => {
   isOpen.value = !isOpen.value;
   if (isOpen.value) {
+    // 打开聊天窗口时重置滚动状态并滚动到底部
+    isAtBottom.value = true;
+    // 在打开聊天窗口时更新方向
+    updateChatDirection();
     setTimeout(() => {
-      scrollToBottom();
+      forceScrollToBottom();
     }, 300);
   }
 };
@@ -217,12 +395,19 @@ const sendMessage = async () => {
     return;
   }
 
+  // 发送新消息时重置滚动状态
+  isAtBottom.value = true;
+  isUserScrolling.value = false;
+
   // 添加用户消息
   chatMessages.value.push({
     id: Date.now(),
     user: userData.value,
     msg: chatMsg.value,
   });
+
+  // 在此处定义，防止获取到输入中的消息
+  const messages = formatMessages(chatMessages.value);
 
   // 添加AI正在输入的消息
   const aiMessageId = Math.random().toString(36).substring(2, 9);
@@ -240,7 +425,7 @@ const sendMessage = async () => {
   // 保存用户问题并清空输入框
   const prompt = chatMsg.value;
   chatMsg.value = "";
-  scrollToBottom();
+  forceScrollToBottom();
 
   // 获取上一次对话ID
   const prevConversationId =
@@ -248,10 +433,15 @@ const sendMessage = async () => {
       ? chatMessages.value[chatMessages.value.length - 3]?.conversation_id || ""
       : "";
 
+  const aiModelMaxTokens =
+    aiModelOptions.find((item) => item.value === aiModel.value)?.maxTokens ||
+    1024;
   // 调用AI接口
   const getAiReplyBody: GetAiReplyBody = {
-    ai: "TY",
+    ai: "SF",
     prompt,
+    messages,
+    max_tokens: aiModelMaxTokens,
     isStream: true,
     conversation_id: prevConversationId || "none",
   };
@@ -284,14 +474,41 @@ const sendMessage = async () => {
         lines.forEach((line) => {
           try {
             const dataObj = aiObj.parseJson(line);
+            if (isEmpty(dataObj)) return;
+            // 检查aiObj是否存在getReasoningContent方法
+            const reasoningContent =
+              "getReasoningContent" in aiObj
+                ? aiObj.getReasoningContent(dataObj)
+                : "";
             const content = aiObj.getContent(dataObj) || "";
 
-            if (i === 0) aiMessage.msg = "";
+            if (i === 0) {
+              aiMessage.msg = "";
+              aiMessage.reasoning_content = "";
+            }
             aiMessage.conversation_id = dataObj.id || dataObj.request_id;
             aiMessage.msg += content;
-            scrollToBottom();
+            if (reasoningContent) {
+              aiMessage.reasoning_content =
+                (aiMessage.reasoning_content || "") + reasoningContent;
+              aiMessage.has_reasoning = true;
+
+              // 有推理内容时就将消息ID添加到已展开列表
+              if (!expandedReasonings.value.includes(aiMessageId)) {
+                expandedReasonings.value.push(aiMessageId);
+              }
+            }
+
+            // 只有当用户在底部或发送新消息后才自动滚动
+            if (isAtBottom.value && !isUserScrolling.value) {
+              scrollToBottom();
+            }
+
             i++;
-          } catch (e) {}
+          } catch (e) {
+            console.log("AI解析错误", e);
+            aiMessage.msg = "抱歉，我遇到了一些问题，请稍后再试。";
+          }
         });
       }
     } catch (error) {
@@ -310,12 +527,18 @@ const sendMessage = async () => {
     }
     isAiResponding.value = false;
     currentReader.value = null;
-    scrollToBottom();
+
+    // 错误情况下滚动到底部
+    if (isAtBottom.value) {
+      scrollToBottom();
+    }
   }
 };
 
-// 滚动到底部
+// 常规滚动到底部（只有当用户在底部或主动发送消息时才会触发）
 const scrollToBottom = () => {
+  if (!isAtBottom.value || isUserScrolling.value) return;
+
   setTimeout(() => {
     if (messagesRef.value) {
       messagesRef.value.scrollTop = messagesRef.value.scrollHeight;
@@ -323,11 +546,33 @@ const scrollToBottom = () => {
   }, 50);
 };
 
-// 监听消息变化，自动滚动到底部
+// 强制滚动到底部（在用户发送消息或打开聊天时使用）
+const forceScrollToBottom = () => {
+  setTimeout(() => {
+    if (messagesRef.value) {
+      messagesRef.value.scrollTop = messagesRef.value.scrollHeight;
+    }
+  }, 50);
+};
+
+// 监听聊天消息变化，确保新消息的推理内容总是展开的
 watch(
   chatMessages,
   () => {
-    scrollToBottom();
+    // 找出所有具有推理内容但未加入展开列表的消息
+    chatMessages.value.forEach((message) => {
+      if (
+        message.has_reasoning &&
+        !expandedReasonings.value.includes(message.id)
+      ) {
+        expandedReasonings.value.push(message.id);
+      }
+    });
+
+    // 滚动处理
+    if (isAtBottom.value && !isUserScrolling.value) {
+      scrollToBottom();
+    }
   },
   { deep: true }
 );
@@ -387,6 +632,40 @@ watch(
   pointer-events: all;
 }
 
+/* 左侧展示样式 */
+.direction-left .ai-chat-window {
+  margin-left: 0;
+  margin-right: 15px;
+  transform: translateX(20px);
+}
+
+.direction-left.ai-chat-open .ai-chat-window {
+  transform: translateX(0);
+  margin-right: 65px; /* 按钮宽度 + 间距 */
+  margin-left: -615px;
+}
+
+/* 底部展示样式 */
+.direction-bottom {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.direction-bottom .ai-chat-window {
+  margin-left: 0;
+  margin-top: 15px;
+  transform: translateY(-20px);
+  width: 550px;
+  margin-bottom: -600px;
+}
+
+.direction-bottom.ai-chat-open .ai-chat-window {
+  margin-top: 15px;
+  margin-bottom: 0;
+  transform: translateY(0);
+  height: 600px;
+}
+
 /* 移动端适配 */
 @media screen and (max-width: 768px) {
   .ai-chat-window {
@@ -409,6 +688,13 @@ watch(
 
   .ai-chat-open .ai-chat-window {
     margin-left: 0;
+    transform: translateY(0);
+  }
+
+  .direction-left.ai-chat-open .ai-chat-window,
+  .direction-bottom.ai-chat-open .ai-chat-window {
+    margin-left: 0;
+    margin-right: 0;
     transform: translateY(0);
   }
 
@@ -463,10 +749,6 @@ watch(
   .ai-chat-open .ai-model-select {
     pointer-events: all;
   }
-
-  .ai-model-select :deep(.el-select) {
-    width: 70px;
-  }
 }
 
 .ai-chat-messages {
@@ -493,7 +775,7 @@ watch(
   max-width: 70%;
 }
 
-.current-user .message-content {
+.current-user .message-name {
   text-align: right;
 }
 
@@ -501,7 +783,7 @@ watch(
 @media screen and (max-width: 768px) {
   .ai-chat-messages {
     flex: 1;
-    max-height: calc(100vh - 150px);
+    max-height: calc(100vh - 177px);
   }
 
   .message-content {
@@ -537,6 +819,73 @@ watch(
 
 .current-user .message-text {
   background-color: #e1f5fe;
+}
+
+/* 深度思考区域样式 */
+.reasoning-container {
+  margin-bottom: 10px;
+  border-radius: 8px;
+  background-color: #f8f9fa;
+  overflow: hidden;
+}
+
+.reasoning-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background-color: #f0f2f5;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s;
+}
+
+.reasoning-header:hover {
+  background-color: #e6e8eb;
+}
+
+.reasoning-title {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  font-weight: 500;
+  color: #555;
+}
+
+.reasoning-title .el-icon {
+  margin-right: 6px;
+  font-size: 16px;
+  color: #1976d2;
+}
+
+.reasoning-toggle .el-icon {
+  font-size: 14px;
+  color: #888;
+  transition: transform 0.3s;
+}
+
+.reasoning-content {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: 0.3s;
+  overflow: hidden;
+  padding: 0 12px;
+}
+
+/* 隐藏滚动条 */
+.reasoning-content::-webkit-scrollbar {
+  display: none;
+}
+
+.reasoning-content.expanded {
+  grid-template-rows: 1fr;
+  padding: 12px;
+}
+
+.reasoning-content ::v-deep(.md-editor-preview) {
+  color: #606060;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .ai-chat-input {
@@ -579,7 +928,6 @@ watch(
 
   .ai-chat-input textarea {
     padding: 8px;
-    margin-bottom: 8px;
     max-height: 80px;
   }
 

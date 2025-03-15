@@ -170,7 +170,7 @@ export const getRandomArrayString = (
  * @returns
  */
 export const parseSSEAIResToObj = (res: string) => {
-  if (!res || !res.includes('data')) return null;
+  if (!res || !res.includes("data")) return null;
   const resultStr = res.split("data")[1].slice(1);
   const resultObj = JSON.parse(resultStr);
   return resultObj;
@@ -190,6 +190,18 @@ export const getSSEAiReply = (ai: AiType) => {
     KIMI: {
       parseJson: (val) => JSON.parse(val.replace("data: ", "")),
       getContent: (data) => data.choices[0].delta.content,
+    },
+    SF: {
+      parseJson: (val) => {
+        val = val?.replace("data: ", "");
+        if (val === "[DONE]") return null;
+        return JSON.parse(val.replace("data: ", ""));
+      },
+      getReasoningContent: (data) => data?.choices?.[0]?.delta?.reasoning_content,
+      getContent: (data) => {
+        if (!data) return null;
+        return data?.choices?.[0]?.delta?.content;
+      },
     },
   };
 
@@ -221,7 +233,7 @@ export const handleAiSSERes = async (
       try {
         const dataObj = aiObj.parseJson(line);
         callback(aiObj.getContent(dataObj) || "", dataObj);
-      } catch (e) { }
+      } catch (e) {}
     });
   }
 };

@@ -229,9 +229,9 @@ const handleAIWrite = async () => {
   if (editForm.snippet !== "") editForm.snippet = "";
   AIIsWritting.value = true;
   const prompt = "请帮我写一段文章摘要,字数不超过两百个字符,文章内容如下:";
-  const model = "qwen-max";
+  const model = "Qwen/Qwen2.5-7B-Instruct";
   const getAiReplyBody: GetAiReplyBody = {
-    ai: "TY",
+    ai: "SF",
     prompt: prompt + editForm.content,
     isStream: true,
   };
