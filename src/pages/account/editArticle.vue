@@ -410,7 +410,7 @@ const submitForm = async (formEl: FormInstance | undefined) => {
   width: 80%;
 }
 :deep(.md-editor-fullscreen) {
-  z-index: 10;
+  z-index: 99;
 }
 :deep(.el-form-item__label) {
   font-family: "tsxmm";
