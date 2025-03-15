@@ -4,7 +4,6 @@
     :class="{
       'ai-chat-open': isOpen,
       'direction-left': chatDirection === 'left',
-      'direction-bottom': chatDirection === 'bottom',
     }"
     :style="{ left: position.x + 'px', bottom: position.y + 'px' }"
   >
