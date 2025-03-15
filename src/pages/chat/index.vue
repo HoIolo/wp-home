@@ -237,15 +237,15 @@ type ChartObjects = ChartUser & {
 
 // 聊天对象数据
 const chartObjects = ref<ChartObjects[]>([
-  {
-    id: 0,
-    name: "AI助手",
-    avatar: "https://xiaoxiblog.oss-cn-beijing.aliyuncs.com/image/aibot.png",
-    active: false,
-    isGroupChat: false,
-    charts: [],
-    sendHandle: aiSend,
-  },
+  // {
+  //   id: 0,
+  //   name: "AI助手",
+  //   avatar: "https://xiaoxiblog.oss-cn-beijing.aliyuncs.com/image/aibot.png",
+  //   active: false,
+  //   isGroupChat: false,
+  //   charts: [],
+  //   sendHandle: aiSend,
+  // },
   {
     id: 1,
     name: "聊天室",
