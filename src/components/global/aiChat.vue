@@ -400,7 +400,11 @@ watch(
     margin-left: 0;
     transform: translateY(20px);
     border-radius: 0;
-    z-index: -1;
+    z-index: 9999;
+  }
+
+  .ai-chat-open .ai-chat-window {
+    height: 100vh;
   }
 
   .ai-chat-open .ai-chat-window {
