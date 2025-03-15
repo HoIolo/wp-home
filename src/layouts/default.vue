@@ -14,6 +14,7 @@
     <ClientOnly>
       <Pet v-if="showPet"></Pet>
       <GlobalMusic v-if="showMusic" />
+      <GlobalAiChat />
       <GlobalSetting
         @isShowMusic="onMusicSetting"
         @is-show-pet="onPetSetting"
