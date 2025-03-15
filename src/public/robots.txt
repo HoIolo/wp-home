@@ -1,2 +1,10 @@
 User-agent: *
-Allow: *
+Allow: /
+Disallow: /account/
+Disallow: /login/
+Disallow: /register/
+Disallow: /forget/
+Disallow: /message/
+
+# Sitemap
+Sitemap: https://www.hoiolo.cn/sitemap.xml
