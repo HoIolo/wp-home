@@ -1,16 +1,43 @@
 <template>
   <nuxt-layout name="default">
     <Banner :height="'50vh'" :background="backgroundImage">{{
-      article_data?.title
+      article_data?.title || '文章详情'
     }}</Banner>
     <nuxt-layout
       name="container"
       :user="userData"
       :showUserInfo="false"
-      :showRight="true"
+      :showRight="!isArticleRejectedOrPending"
     >
       <template #containerLeftMain>
-        <el-skeleton :loading="pending" animated style="padding: 25px 10px">
+        <!-- 审核不通过时的显示内容 -->
+        <div v-if="!pending && isArticleRejected" class="article-rejected">
+          <el-result
+            icon="error"
+            title="文章未通过审核"
+            :sub-title="rejectMessage"
+          >
+            <template #extra>
+              <div class="reject-reason">
+                <h3>审核未通过原因：</h3>
+                <p>{{ rejectReason }}</p>
+              </div>
+            </template>
+          </el-result>
+        </div>
+        
+        <!-- 审核中状态显示内容 -->
+        <div v-else-if="!pending && isArticlePending" class="article-pending">
+          <el-result
+            icon="info"
+            title="文章审核中"
+            :sub-title="pendingMessage"
+          >
+          </el-result>
+        </div>
+
+        <!-- 正常文章内容显示（审核通过） -->
+        <el-skeleton v-else :loading="pending" animated style="padding: 25px 10px">
           <template #template>
             <el-skeleton-item
               variant="p"
@@ -77,7 +104,9 @@
             </div>
           </template>
         </el-skeleton>
-        <ClientOnly>
+        
+        <!-- 评论部分只在审核通过时显示 -->
+        <ClientOnly v-if="!isArticleRejectedOrPending">
           <UserComment
             :config="config"
             :request-comments="requestComments"
@@ -89,6 +118,7 @@
       </template>
       <template #containerRight>
         <MdCatalog
+          v-if="!isArticleRejectedOrPending"
           :editorId="mdState.id"
           :scrollElement="scrollElement"
           :scrollElementOffsetTop="100"
@@ -108,14 +138,16 @@ import {
   UserFilled,
 } from "@element-plus/icons";
 import emoji from "~/assets/emoji";
-import type { ConfigApi, CommentApi } from "undraw-ui";
+import { type ConfigApi, type CommentApi, isEmpty } from "undraw-ui";
 import { dayjs } from "element-plus";
 import { getArticleDetail } from "~/api/articleApi";
 import { selectComment } from "~/api/commentApi";
 import type { Comment } from "~/types/comment";
 import type { ResponseData, ResponseType } from "~/types/common";
+import type { ArticleErrorType, ArticleType } from "~/types/article";
 
 const route = useRoute();
+const router = useRouter();
 
 const mdState = reactive({
   id: "my-editor",
@@ -134,8 +166,48 @@ const {
   pending,
 } = await getArticleDetail(id);
 
+// 判断是否是审核不通过的文章
+const isArticleRejected = computed(() => {
+  const articleData = data.value?.data?.row as ArticleErrorType;
+  return !pending.value && articleData?.status === 3;
+});
+
+// 判断是否是审核中的文章
+const isArticlePending = computed(() => {
+  const articleData = data.value?.data?.row as ArticleErrorType;
+  return !pending.value && articleData?.status === 1;
+});
+
+// 判断文章是否被拒绝或者处于审核中状态
+const isArticleRejectedOrPending = computed(() => {
+  return isArticleRejected.value || isArticlePending.value;
+});
+
+// 审核未通过的信息
+const rejectMessage = computed(() => {
+  const articleData = data.value?.data?.row as ArticleErrorType;
+  return articleData?.message || "文章未通过审核";
+});
+
+// 审核未通过的原因
+const rejectReason = computed(() => {
+  const articleData = data.value?.data?.row as ArticleErrorType;
+  return articleData?.reason || "未提供具体原因";
+});
+
+// 审核中的信息
+const pendingMessage = computed(() => {
+  const articleData = data.value?.data?.row as ArticleErrorType;
+  return articleData?.message || "文章正在审核中，请稍后查看";
+});
+
 const article_data = computed(() => {
   if (!pending.value) {
+    // 如果文章审核不通过或者审核中，不返回文章内容
+    if (isArticleRejectedOrPending.value) {
+      return null;
+    }
+
     if (!data.value) {
       throw createError({
         statusCode: 404,
@@ -143,13 +215,13 @@ const article_data = computed(() => {
       });
     }
 
-    return data.value.data.row;
+    return data.value.data.row as ArticleType;
   }
   return null;
 });
 
 useHead({
-  title: article_data.value?.title || "详情页",
+  title: article_data.value?.title || rejectMessage.value || pendingMessage.value || "详情页",
 });
 
 // 背景图片
@@ -175,11 +247,15 @@ const commentData = ref<ResponseType<ResponseData<Comment>>>();
 
 watch(data, async (newData) => {
   if (newData) {
+    const articleData = newData.data.row as ArticleType;
     const commentRes = await requestComments(
-      newData.data.row.id,
+      articleData.id,
       page.value,
       offset.value
     );
+    if (isEmpty(commentRes?.value)) {
+      return;
+    }
     commentData.value = commentRes.value;
 
     // 更新评论数据
@@ -286,6 +362,40 @@ const config = reactive<ConfigApi>({
 </script>
 
 <style scoped lang="less">
+.article-rejected, .article-pending {
+  padding: 30px 20px;
+  background-color: var(--defaultColor);
+  border-radius: 11px;
+  
+  .reject-reason {
+    margin: 20px 0;
+    padding: 15px;
+    background-color: #fef0f0;
+    border-radius: 8px;
+    text-align: left;
+    
+    h3 {
+      margin-top: 0;
+      color: #f56c6c;
+      font-size: 16px;
+    }
+    
+    p {
+      margin-bottom: 0;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+  }
+  
+  .action-buttons {
+    margin-top: 20px;
+  }
+}
+
+.article-pending {
+  background-color: var(--defaultColor);
+}
+
 .md-editor-catalog {
   position: sticky;
   top: 100px;

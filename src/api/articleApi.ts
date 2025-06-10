@@ -1,4 +1,4 @@
-import type { ArticleType } from "~/types/article";
+import type { ArticleErrorType, ArticleType } from "~/types/article";
 import type { ResponseData } from "~/types/common";
 
 interface selectArticleDataType {
@@ -10,14 +10,36 @@ interface selectArticleDataType {
 
 const API_PREFIX = "/article";
 
-export const updateArticle = <T>(
+// 更新文章访问量
+export const updateArticleWatch = <T>(
   id: string,
   data: { article_watch: number }
 ) => {
-  return useRequest({
+  return useRequest<T>({
     url: API_PREFIX + "/update/" + id,
     data,
     method: "PATCH",
+  });
+};
+
+export interface UpdateArticleDTO {
+  title?: string;
+  content?: string;
+  description?: string;
+  type_id?: string | number;
+  tags?: string[];
+  pic?: string;
+  author_id?: string | number;
+}
+// 更新文章内容
+export const updateArticle = <T>(
+  id: string,
+  data: UpdateArticleDTO
+) => {
+  return useRequest<T>({
+    url: API_PREFIX + "/" + id,
+    data,
+    method: "PUT",
   });
 };
 
@@ -67,19 +89,23 @@ export const selectArticle = (
 /**
  * 获取文章详情
  * @param id
+ * @param params
  * @returns
  */
-export const getArticleDetail = (id: string) => {
-  return useRequest<ResponseData<ArticleType>>({
+export const getArticleDetail = (id: string, params?: {
+  isEdit?: 0 | 1;
+}) => {
+  return useRequest<ResponseData<ArticleType | ArticleErrorType>>({
     url: API_PREFIX + "/" + id,
     method: "GET",
+    params,
   });
 };
 
-type AddArticle = {
+export type AddArticle = {
   author_id: number;
   title: string;
-  type_id: string;
+  type_id: number;
   description: string;
   pic: string;
   content: string;
@@ -121,8 +147,9 @@ export const getArticleByTagId = (params: GetArticleByTagIdType) => {
   });
 };
 
-type GetArticleByUidType = PageType & {
+export type GetArticleByUidType = PageType & {
   uid: number;
+  is_approved?: -1 | 0 | 1 | 2; // -1: 全部, 0: 待审核, 1: 审核中, 2: 审核通过, 3: 审核不通过
 };
 /**
  * 根据用户id获取关联的文章

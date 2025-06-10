@@ -19,6 +19,7 @@
               >
                 <User v-if="index === 0" />
                 <Edit v-if="index === 1" />
+                <Document v-if="index === 2" />
               </el-icon>
               <span>{{ item.title }}</span>
             </nuxt-link>
@@ -47,7 +48,7 @@
 </template>
 
 <script setup lang="ts">
-import { Edit, User } from "@element-plus/icons";
+import { Edit, User, Document } from "@element-plus/icons";
 
 const router = useRouter();
 
@@ -66,6 +67,10 @@ const accountProps = ref({
     {
       title: "编辑文章",
       linkpath: "/account/editArticle",
+    },
+    {
+      title: "发布历史",
+      linkpath: "/account/articleHistory",
     },
   ],
   title: "我的信息",

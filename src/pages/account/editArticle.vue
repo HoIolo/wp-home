@@ -1,14 +1,31 @@
 <template>
   <nuxt-layout name="default" :user="userState">
     <Banner :height="'50vh'">账户</Banner>
-    <nuxt-layout name="account" :active="1" :title="'编辑文章'">
+    <nuxt-layout
+      name="account"
+      :active="1"
+      :title="isEditMode ? '编辑文章' : '发布文章'"
+    >
       <template #account-wrap>
+        <div v-if="isLoading" class="loading-container">
+          <el-skeleton :rows="6" animated />
+        </div>
         <el-form
+          v-else
           :model="editForm"
           label-width="50px"
           :rules="rules"
           ref="ruleFormRef"
         >
+          <el-alert
+            v-if="rejectReason"
+            title="审核未通过原因"
+            type="error"
+            :description="rejectReason"
+            show-icon
+            :closable="true"
+            style="margin-bottom: 20px"
+          />
           <el-form-item label="标题:" prop="title">
             <el-input
               type="text"
@@ -50,7 +67,7 @@
                   v-for="item in typeOptions"
                   :key="item.id"
                   :label="item.name"
-                  :value="item.id + ''"
+                  :value="item.id"
                 />
               </el-select>
             </client-only>
@@ -123,7 +140,7 @@
                 type="primary"
                 size="default"
                 @click="submitForm(ruleFormRef)"
-                >发布</el-button
+                >{{ isEditMode ? "更新" : "发布" }}</el-button
               >
             </div>
           </el-form-item>
@@ -139,17 +156,29 @@ import { Plus } from "@element-plus/icons";
 import type { UploadProps } from "element-plus";
 import { MdEditor } from "md-editor-v3";
 import "md-editor-v3/lib/style.css";
-import { addArticle } from "~/api/articleApi";
+import { addArticle, getArticleDetail, updateArticle, type AddArticle, type UpdateArticleDTO } from "~/api/articleApi";
 import { getAIReply, type GetAiReplyBody } from "~/api/aiApi";
 import { uploadImage } from "~/api/common";
 import { getTags } from "~/api/tagsApi";
 import { getArticleTypes } from "~/api/articleTypeApi";
+import type { ArticleType } from "~/types/article";
 
 useHead({
   title: "文章编辑",
 });
+
 const router = useRouter();
+const route = useRoute();
 const ruleFormRef = ref<FormInstance>();
+const isEditMode = ref(false);
+const articleId = ref(route.query.id as string | undefined);
+const isLoading = ref(!!articleId.value); // 如果有ID，默认加载中
+const rejectReason = ref("");
+
+// 在组件顶层使用getArticleDetail，但仅在有ID时调用
+const { data: articleData, pending } = articleId.value 
+  ? await getArticleDetail(articleId.value, { isEdit: 1 })
+  : { data: ref(null), pending: ref(false) };
 
 const uploadUrl = ref("");
 uploadUrl.value = useRuntimeConfig().public.requestBaseUrl + "/image";
@@ -164,19 +193,52 @@ const editForm = reactive<{
   title: string;
   snippet: string;
   content: string;
-  type_id: string;
+  type_id: number;
   imageUrl: string;
   tags: string[];
 }>({
   title: "",
-  type_id: "",
+  type_id: undefined,
   snippet: "",
   content: defaultContent,
   imageUrl: "",
   tags: [],
 });
 
-if (process.client) {
+// 处理从API获取的文章数据
+watch(articleData, (response) => {
+  if (!response) return;
+  
+  const responseData = response?.data;
+  
+  if (response?.code === 1001 && responseData?.row) {
+    const articleData = responseData.row as ArticleType;
+    
+    // 填充表单数据
+    editForm.title = articleData.title || "";
+    editForm.snippet = articleData.description || "";
+    editForm.content = articleData.content || defaultContent;
+    editForm.imageUrl = articleData.pic || "";
+    editForm.type_id = articleData.type?.id || 0;
+    editForm.tags = Array.isArray(articleData.tags) ? articleData.tags : [];
+    
+    // 标记为编辑模式
+    isEditMode.value = true;
+  } else if (response?.code !== 1001) {
+    useMessage({
+      message: response?.message || "加载文章失败",
+      type: "error",
+    });
+  }
+}, { immediate: true });
+
+// 监控加载状态
+watch(pending, (isPending) => {
+  isLoading.value = isPending;
+}, { immediate: true });
+
+// 如果没有文章ID且在客户端环境，从localStorage加载内容
+if (process.client && !articleId.value) {
   editForm.content = localStorage.getItem("editContent") || defaultContent;
 }
 
@@ -191,7 +253,9 @@ watch(
   { deep: true }
 );
 
-const { data: getArticleTypesResponse } = await getArticleTypes({offset: 100});
+const { data: getArticleTypesResponse } = await getArticleTypes({
+  offset: 100,
+});
 const typeOptions = ref(getArticleTypesResponse.value?.data?.rows || []);
 
 watch(
@@ -374,18 +438,39 @@ const submitForm = async (formEl: FormInstance | undefined) => {
   const userState = await useUserState();
   formEl.validate(async (valid) => {
     if (valid) {
-      const { data } = await addArticle({
-        author_id: userState.value.user.id,
-        title: editForm.title,
-        content: editForm.content,
-        type_id: editForm.type_id,
-        description: editForm.snippet,
-        pic: editForm.imageUrl,
-        tags: editForm.tags,
-      });
-      if (data.value.code === 1001) {
+      let response;
+
+      if (isEditMode.value && articleId.value) {
+        // 更新已有文章
+        const updateData: UpdateArticleDTO = {
+          author_id: userState.value.user.id,
+          title: editForm.title,
+          content: editForm.content,
+          type_id: editForm.type_id,
+          description: editForm.snippet,
+          pic: editForm.imageUrl,
+          tags: editForm.tags,
+        };
+        response = await updateArticle(articleId.value, updateData);
+      } else {
+        // 创建新文章
+        const addData: AddArticle = {
+          author_id: userState.value.user.id,
+          title: editForm.title,
+          content: editForm.content,
+          type_id: editForm.type_id,
+          description: editForm.snippet,
+          pic: editForm.imageUrl,
+          tags: editForm.tags,
+        };
+        response = await addArticle(addData);
+      }
+
+      const { data } = response || { data: ref(null) };
+
+      if (data.value?.code === 1001) {
         useMessage({
-          message: "发布成功",
+          message: isEditMode.value ? "更新成功" : "发布成功",
           type: "success",
         });
         localStorage.removeItem("editContent");
@@ -456,6 +541,11 @@ const submitForm = async (formEl: FormInstance | undefined) => {
 :deep(.hljs-comment),
 :deep(.code-block) {
   white-space: pre-wrap;
+}
+
+.loading-container {
+  padding: 20px;
+  min-height: 500px;
 }
 </style>
 
